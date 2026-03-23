@@ -1,54 +1,46 @@
 package at.ac.fhcampuswien.controllers;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import at.ac.fhcampuswien.models.Movie;
+import at.ac.fhcampuswien.ApiUtils;
+
 import java.io.*;
 import java.util.*;
 
 public class MovieController implements HttpHandler {
-    private List<Movie> movies = new ArrayList<>();
-    public MovieController() {
-        movies.add(new Movie("Shawshank Redemption", "Drama", 2001));
-        movies.add(new Movie("Snatch", "Comedy", 1997));
-        movies.add(new Movie("Deadpool", "Action", 2016));
-        movies.add(new Movie("Cars", "Animation", 2006));
-        movies.add(new Movie("Interstellar", "Sci-Fi", 2014));
-    }
+
+    private List<Movie> movies = Movie.generateDummyMovies();
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
-        if (path.equals("/api/movies/getAll")) {
+
+        // routing by endpoint
+        if (path.endsWith("/getAll")) {
             handleGetAll(exchange, method);
-        }
 
-        else if (path.equals("/api/movies/add")) {
+        } else if (path.endsWith("/add")) {
             handleAdd(exchange, method);
-        }
 
-
-        else if (path.equals("/api/movies/delete")) {
+        } else if (path.endsWith("/delete")) {
             handleDelete(exchange, method);
-        }
 
-
-        else if (path.equals("/api/movies/update")) {
+        } else if (path.endsWith("/update")) {
             handleUpdate(exchange, method);
-        }
 
-        else {
-            sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
+        } else {
+            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
         }
-
     }
 
-    //Get all
+    // get all
     private void handleGetAll(HttpExchange exchange, String method) throws IOException {
 
-
         if (!method.equals("GET")) {
-            sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
+            ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
 
@@ -56,25 +48,27 @@ public class MovieController implements HttpHandler {
 
         for (int i = 0; i < movies.size(); i++) {
             Movie m = movies.get(i);
+
             json += "{";
-            json += "\"id\":\"" + m.getId() + "\",";
-            json += "\"title\":\"" + m.getTitle() + "\",";
-            json += "\"genre\":\"" + m.getGenre() + "\",";
+            json += "\"id\":\"" + m.getId() + "\",\n";
+            json += "\"title\":\"" + m.getTitle() + "\",\n";
+            json += "\"genre\":\"" + m.getGenre() + "\",\n";
             json += "\"releaseYear\":" + m.getReleaseYear();
             json += "}";
 
-            if (i < movies.size() - 1) json += ",";
+            if (i < movies.size() - 1) json += ",\n\n";
         }
 
         json += "]";
-        sendResponse(exchange, 200, json);
+
+        ApiUtils.sendResponse(exchange, 200, json);
     }
 
     // add
     private void handleAdd(HttpExchange exchange, String method) throws IOException {
 
         if (!method.equals("POST")) {
-            sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
+            ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
 
@@ -82,7 +76,7 @@ public class MovieController implements HttpHandler {
         Movie newMovie = parseMovieWithoutId(body);
 
         if (newMovie == null) {
-            sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
+            ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
             return;
         }
 
@@ -91,20 +85,20 @@ public class MovieController implements HttpHandler {
                     m.getGenre().equals(newMovie.getGenre()) &&
                     m.getReleaseYear() == newMovie.getReleaseYear()) {
 
-                sendResponse(exchange, 400, "{ \"error\": \"Movie already exists\" }");
+                ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Movie already exists\" }");
                 return;
             }
         }
 
         movies.add(newMovie);
-        sendResponse(exchange, 201, "{ \"message\": \"Movie added successfully\" }");
+        ApiUtils.sendResponse(exchange, 201, "{ \"message\": \"Movie added successfully\" }");
     }
 
     // delete
     private void handleDelete(HttpExchange exchange, String method) throws IOException {
 
         if (!method.equals("DELETE")) {
-            sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
+            ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
 
@@ -112,7 +106,7 @@ public class MovieController implements HttpHandler {
         Movie toDelete = parseMovieWithoutId(body);
 
         if (toDelete == null) {
-            sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
+            ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
             return;
         }
 
@@ -122,19 +116,19 @@ public class MovieController implements HttpHandler {
                     m.getReleaseYear() == toDelete.getReleaseYear()) {
 
                 movies.remove(m);
-                sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
+                ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
                 return;
             }
         }
 
-        sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
+        ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
     }
 
     // update
     private void handleUpdate(HttpExchange exchange, String method) throws IOException {
 
         if (!method.equals("PUT")) {
-            sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
+            ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
 
@@ -150,27 +144,31 @@ public class MovieController implements HttpHandler {
 
             for (Movie m : movies) {
                 if (m.getId().equals(id)) {
-                    movies.remove(m);
-                    movies.add(new Movie(title, genre, year));
-                    sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
+
+                    // update fields
+                    m.setTitle(title);
+                    m.setGenre(genre);
+                    m.setReleaseYear(year);
+
+                    ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
                     return;
                 }
             }
 
-            sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
+            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
 
         } catch (Exception e) {
-            sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
+            ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
         }
     }
 
-    // helper
-
+    // read body
     private String readBody(HttpExchange exchange) throws IOException {
         InputStream is = exchange.getRequestBody();
         return new String(is.readAllBytes());
     }
 
+    // parse json (manual)
     private Movie parseMovieWithoutId(String body) {
         try {
             String title = body.split("\"title\":\"")[1].split("\"")[0];
@@ -183,15 +181,4 @@ public class MovieController implements HttpHandler {
             return null;
         }
     }
-
-
-
-    private void sendResponse(HttpExchange exchange, int status, String response) throws IOException {
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(status, response.getBytes().length);
-        OutputStream os = exchange.getResponseBody();
-        os.write(response.getBytes());
-        os.close();
-    }
-
 }
