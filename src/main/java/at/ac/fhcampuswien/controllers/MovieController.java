@@ -8,9 +8,20 @@ import at.ac.fhcampuswien.ApiUtils;
 import java.io.*;
 import java.util.*;
 
+//ue2:
+// importing gson to convert json to java objects
+// and importing our new service layer
+import com.google.gson.Gson;
+import at.ac.fhcampuswien.services.MovieService;
+
 public class MovieController implements HttpHandler {
 
-    private List<Movie> movies = Movie.generateDummyMovies();
+    //ue2:
+    // replacing the raw list with our service
+    // injecting the dummy movies list straight into the service constructor
+    // we also set up gson here so we can reuse it
+    private MovieService movieService = new MovieService(Movie.generateDummyMovies());
+    private Gson gson = new Gson();
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -18,19 +29,18 @@ public class MovieController implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
 
-        // routing by endpoint
         if (path.endsWith("/getAll")) {
             handleGetAll(exchange, method);
-
         } else if (path.endsWith("/add")) {
             handleAdd(exchange, method);
-
         } else if (path.endsWith("/delete")) {
             handleDelete(exchange, method);
-
         } else if (path.endsWith("/update")) {
             handleUpdate(exchange, method);
-
+            //ue2:
+            // adding the new route so the server calls our new search function when asked
+        } else if (path.endsWith("/search")) {
+            handleSearch(exchange, method);
         } else {
             ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
         }
@@ -44,22 +54,10 @@ public class MovieController implements HttpHandler {
             return;
         }
 
-        String json = "[";
-
-        for (int i = 0; i < movies.size(); i++) {
-            Movie m = movies.get(i);
-
-            json += "{";
-            json += "\"id\":\"" + m.getId() + "\",\n";
-            json += "\"title\":\"" + m.getTitle() + "\",\n";
-            json += "\"genre\":\"" + m.getGenre() + "\",\n";
-            json += "\"releaseYear\":" + m.getReleaseYear();
-            json += "}";
-
-            if (i < movies.size() - 1) json += ",\n\n";
-        }
-
-        json += "]";
+        //ue2:
+        // we ask the service for all movies then use gson to turn that list into text automatically
+        List<Movie> allMovies = movieService.getAllMovies();
+        String json = gson.toJson(allMovies);
 
         ApiUtils.sendResponse(exchange, 200, json);
     }
@@ -73,24 +71,23 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-        Movie newMovie = parseMovieWithoutId(body);
+        //ue2:
+        // gson turns the raw text into a beautiful movie object without us splitting anything manually
+        Movie newMovie = gson.fromJson(body, Movie.class);
 
         if (newMovie == null) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
             return;
         }
 
-        for (Movie m : movies) {
-            if (m.getTitle().equals(newMovie.getTitle()) &&
-                    m.getGenre().equals(newMovie.getGenre()) &&
-                    m.getReleaseYear() == newMovie.getReleaseYear()) {
-
-                ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Movie already exists\" }");
-                return;
-            }
+        //ue2:
+        // the service does the work and gives us a simple yes or no
+        boolean success = movieService.addMovie(newMovie);
+        if (!success) {
+            ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Movie already exists\" }");
+            return;
         }
 
-        movies.add(newMovie);
         ApiUtils.sendResponse(exchange, 201, "{ \"message\": \"Movie added successfully\" }");
     }
 
@@ -103,25 +100,23 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-        Movie toDelete = parseMovieWithoutId(body);
+        //ue2:
+        // parsing with gson again
+        Movie toDelete = gson.fromJson(body, Movie.class);
 
         if (toDelete == null) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
             return;
         }
 
-        for (Movie m : movies) {
-            if (m.getTitle().equals(toDelete.getTitle()) &&
-                    m.getGenre().equals(toDelete.getGenre()) &&
-                    m.getReleaseYear() == toDelete.getReleaseYear()) {
-
-                movies.remove(m);
-                ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
-                return;
-            }
+        //ue2:
+        // we let the service find and delete it
+        boolean success = movieService.deleteMovie(toDelete);
+        if (success) {
+            ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
+        } else {
+            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
         }
-
-        ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
     }
 
     // update
@@ -133,33 +128,39 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-
         try {
-            String idStr = body.split("\"id\":\"")[1].split("\"")[0];
-            UUID id = UUID.fromString(idStr);
+            //ue2:
+            // gson parses everything including the id automatically so we just give the object to the service
+            Movie updatedMovie = gson.fromJson(body, Movie.class);
+            boolean success = movieService.updateMovie(updatedMovie);
 
-            String title = body.split("\"title\":\"")[1].split("\"")[0];
-            String genre = body.split("\"genre\":\"")[1].split("\"")[0];
-            int year = Integer.parseInt(body.split("\"releaseYear\":")[1].split("}")[0]);
-
-            for (Movie m : movies) {
-                if (m.getId().equals(id)) {
-
-                    // update fields
-                    m.setTitle(title);
-                    m.setGenre(genre);
-                    m.setReleaseYear(year);
-
-                    ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
-                    return;
-                }
+            if (success) {
+                ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
+            } else {
+                ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
             }
-
-            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
 
         } catch (Exception e) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
         }
+    }
+
+    //ue2:
+    // our brand new search handler gets the query from the link
+    // makes it a map with our utility tool gives it to the service and sends the result back as json
+    private void handleSearch(HttpExchange exchange, String method) throws IOException {
+        if (!method.equals("GET")) {
+            ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
+            return;
+        }
+
+        String query = exchange.getRequestURI().getQuery();
+        Map<String, String> params = ApiUtils.parseQueryParams(query);
+
+        List<Movie> results = movieService.searchMovies(params);
+        String json = gson.toJson(results);
+
+        ApiUtils.sendResponse(exchange, 200, json);
     }
 
     // read body
@@ -168,17 +169,6 @@ public class MovieController implements HttpHandler {
         return new String(is.readAllBytes());
     }
 
-    // parse json (manual)
-    private Movie parseMovieWithoutId(String body) {
-        try {
-            String title = body.split("\"title\":\"")[1].split("\"")[0];
-            String genre = body.split("\"genre\":\"")[1].split("\"")[0];
-            int year = Integer.parseInt(body.split("\"releaseYear\":")[1].split("}")[0]);
-
-            return new Movie(title, genre, year);
-
-        } catch (Exception e) {
-            return null;
-        }
-    }
+    //ue2:
+    // the old parse movie without id was removed because gson does it
 }

@@ -20,19 +20,26 @@ public class Main {
 
         // Register controllers and their handlers - REST endpoints
         registerController(server, "/api/hello", new HelloController());
+
         registerController(server, "/api/movies/getAll", movieController);
         registerController(server, "/api/movies/add", movieController);
         registerController(server, "/api/movies/delete", movieController);
         registerController(server, "/api/movies/update", movieController);
 
-        // Start the server
+        //ue2:
+        // add the search link into the server so it knows where to send our user
+        registerController(server, "/api/movies/search", movieController);
+
+        // Start srver
         server.setExecutor(null);
         server.start();
         System.out.printf("Server is running on http://localhost:%d", SERVER_PORT);
+
     }
 
     private static void registerController(HttpServer server, String path, HttpHandler handler) {
         HttpContext context = server.createContext(path, handler);
+
         // Optionally add more configurations to context if needed
     }
 }
