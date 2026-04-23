@@ -61,7 +61,6 @@ public class HelloController implements HttpHandler {
             }
         }
     }
-
     private void handleInfoRequest(String method, HttpExchange exchange) throws IOException {
         // Handle GET for /api/hello/info
         switch (method) {

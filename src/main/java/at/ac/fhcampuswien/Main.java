@@ -29,7 +29,6 @@ public class Main {
         //ue2:
         // add the search link into the server so it knows where to send our user
         registerController(server, "/api/movies/search", movieController);
-
         // Start srver
         server.setExecutor(null);
         server.start();

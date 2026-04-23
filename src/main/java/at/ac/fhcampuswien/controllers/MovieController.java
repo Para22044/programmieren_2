@@ -153,7 +153,6 @@ public class MovieController implements HttpHandler {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
-
         String query = exchange.getRequestURI().getQuery();
         Map<String, String> params = ApiUtils.parseQueryParams(query);
 

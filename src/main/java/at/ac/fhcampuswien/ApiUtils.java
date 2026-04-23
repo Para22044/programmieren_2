@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 // import map and hashmap so we can save the search parameters inside a list of keys and values
 import java.util.Map;
 import java.util.HashMap;
-
 public class ApiUtils {
     public static void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);

@@ -11,7 +11,6 @@ public class Movie {
     private String title;
     private String genre;
     private int releaseYear;
-
     // Constructor
     public Movie(String title, String genre, int releaseYear) {
         this.id = UUID.randomUUID();

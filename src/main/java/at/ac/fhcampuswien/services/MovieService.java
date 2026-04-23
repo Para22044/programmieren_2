@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 
 
 public class MovieService {
-
     // this holds our list of movies
     private List<Movie> movies;
 
