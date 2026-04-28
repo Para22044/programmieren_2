@@ -29,7 +29,7 @@ public class Main {
         //ue2:
         // add the search link into the server so it knows where to send our user
         registerController(server, "/api/movies/search", movieController);
-        // Start srver
+        // Start server
         server.setExecutor(null);
         server.start();
         System.out.printf("Server is running on http://localhost:%d", SERVER_PORT);

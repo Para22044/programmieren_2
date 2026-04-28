@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 public class HelloController implements HttpHandler {
     private final String BASE = "/api/hello/";
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         // Get the HTTP method (GET, POST, etc.)
@@ -61,6 +62,7 @@ public class HelloController implements HttpHandler {
             }
         }
     }
+
     private void handleInfoRequest(String method, HttpExchange exchange) throws IOException {
         // Handle GET for /api/hello/info
         switch (method) {
