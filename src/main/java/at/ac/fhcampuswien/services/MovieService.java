@@ -5,13 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 //ue2:
 //das ist eben neuer file
 //to hold all the logic about finding adding or deleting movies
 // separating the logic from the controller makes the code cleaner and much easier to test
-
-
 
 public class MovieService {
     // this holds our list of movies
@@ -36,7 +33,6 @@ public class MovieService {
                         m.getGenre().equals(newMovie.getGenre()) &&
                         m.getReleaseYear() == newMovie.getReleaseYear()
         );
-
         if (exists) {
             return false;
         }
@@ -100,5 +96,4 @@ public class MovieService {
                 })
                 // finally we gather all the matching ones back into a list
                 .collect(Collectors.toList());
-    }
-}
+    }}
