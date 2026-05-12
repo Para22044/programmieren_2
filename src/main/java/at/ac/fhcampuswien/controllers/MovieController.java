@@ -1,5 +1,9 @@
 package at.ac.fhcampuswien.controllers;
 
+import at.ac.fhcampuswien.exceptions.DatabaseException;
+import at.ac.fhcampuswien.exceptions.MovieNotFoundException;
+import at.ac.fhcampuswien.repositories.MovieRepository;
+import com.google.gson.JsonSyntaxException;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import at.ac.fhcampuswien.models.Movie;
@@ -8,20 +12,13 @@ import at.ac.fhcampuswien.ApiUtils;
 import java.io.*;
 import java.util.*;
 
-//ue2:
-// importing gson to convert json to java objects
-// and importing our new service layer
 import com.google.gson.Gson;
 import at.ac.fhcampuswien.services.MovieService;
 
 public class MovieController implements HttpHandler {
 
-    //ue2:
-    // replacing the raw list with our service
-    // injecting the dummy movies list straight into the service constructor
-    // we also set up gson here so we can reuse it
-    private MovieService movieService = new MovieService(Movie.generateDummyMovies());
-    private Gson gson = new Gson();
+    private final MovieService movieService = new MovieService(new MovieRepository());
+    private final Gson gson = new Gson();
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
@@ -29,33 +26,38 @@ public class MovieController implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
 
-        if (path.endsWith("/getAll")) {
-            handleGetAll(exchange, method);
-        } else if (path.endsWith("/add")) {
-            handleAdd(exchange, method);
-        } else if (path.endsWith("/delete")) {
-            handleDelete(exchange, method);
-        } else if (path.endsWith("/update")) {
-            handleUpdate(exchange, method);
-            //ue2:
-            // adding the new route so the server calls our new search function when asked
-        } else if (path.endsWith("/search")) {
-            handleSearch(exchange, method);
-        } else {
-            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
-        }
-    }
+        try {
+
+            if (path.endsWith("/getAll")) {
+                handleGetAll(exchange, method);
+            } else if (path.endsWith("/add")) {
+                handleAdd(exchange, method);
+            } else if (path.endsWith("/delete")) {
+                handleDelete(exchange, method);
+            } else if (path.endsWith("/update")) {
+                handleUpdate(exchange, method);
+            } else if (path.endsWith("/search")) {
+                handleSearch(exchange, method);
+            } else {
+                ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
+            }
+        } catch (DatabaseException e) {
+            ApiUtils.sendResponse(exchange, 500, "{ \"error\": \"" + e.getMessage() + "\" }");
+        } catch (MovieNotFoundException e) {
+            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"" + e.getMessage() + "\" }");
+        } catch (JsonSyntaxException e) {
+            ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Malformed JSON\" }");
+        } catch (Exception e) {
+            ApiUtils.sendResponse(exchange, 500, "{ \"error\": \"Unexpected server error\" }");
 
     // get all
-    private void handleGetAll(HttpExchange exchange, String method) throws IOException {
+    private void handleGetAll(HttpExchange exchange, String method) throws IOException, DatabaseException {
 
         if (!method.equals("GET")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
         }
 
-        //ue2:
-        // we ask the service for all movies then use gson to turn that list into text automatically
         List<Movie> allMovies = movieService.getAllMovies();
         String json = gson.toJson(allMovies);
 
@@ -63,7 +65,7 @@ public class MovieController implements HttpHandler {
     }
 
     // add
-    private void handleAdd(HttpExchange exchange, String method) throws IOException {
+    private void handleAdd(HttpExchange exchange, String method) throws IOException, DatabaseException {
 
         if (!method.equals("POST")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
@@ -71,8 +73,6 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-        //ue2:
-        // gson turns the raw text into a beautiful movie object without us splitting anything manually
         Movie newMovie = gson.fromJson(body, Movie.class);
 
         if (newMovie == null) {
@@ -80,8 +80,6 @@ public class MovieController implements HttpHandler {
             return;
         }
 
-        //ue2:
-        // the service does the work and gives us a simple yes or no
         boolean success = movieService.addMovie(newMovie);
         if (!success) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Movie already exists\" }");
@@ -92,7 +90,7 @@ public class MovieController implements HttpHandler {
     }
 
     // delete
-    private void handleDelete(HttpExchange exchange, String method) throws IOException {
+    private void handleDelete(HttpExchange exchange, String method) throws IOException, DatabaseException {
 
         if (!method.equals("DELETE")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
@@ -100,8 +98,6 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-        //ue2:
-        // parsing with gson again
         Movie toDelete = gson.fromJson(body, Movie.class);
 
         if (toDelete == null) {
@@ -109,8 +105,6 @@ public class MovieController implements HttpHandler {
             return;
         }
 
-        //ue2:
-        // we let the service find and delete it
         boolean success = movieService.deleteMovie(toDelete);
         if (success) {
             ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
@@ -120,7 +114,7 @@ public class MovieController implements HttpHandler {
     }
 
     // update
-    private void handleUpdate(HttpExchange exchange, String method) throws IOException {
+    private void handleUpdate(HttpExchange exchange, String method) throws IOException, DatabaseException, MovieNotFoundException {
 
         if (!method.equals("PUT")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
@@ -129,8 +123,6 @@ public class MovieController implements HttpHandler {
 
         String body = readBody(exchange);
         try {
-            //ue2:
-            // gson parses everything including the id automatically so we just give the object to the service
             Movie updatedMovie = gson.fromJson(body, Movie.class);
             boolean success = movieService.updateMovie(updatedMovie);
 
@@ -145,10 +137,7 @@ public class MovieController implements HttpHandler {
         }
     }
 
-    //ue2:
-    // our brand new search handler gets the query from the link
-    // makes it a map with our utility tool gives it to the service and sends the result back as json
-    private void handleSearch(HttpExchange exchange, String method) throws IOException {
+    private void handleSearch(HttpExchange exchange, String method) throws IOException, DatabaseException {
         if (!method.equals("GET")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
             return;
@@ -167,7 +156,4 @@ public class MovieController implements HttpHandler {
         InputStream is = exchange.getRequestBody();
         return new String(is.readAllBytes());
     }
-
-    //ue2:
-    // the old parse movie without id was removed because gson does it
 }

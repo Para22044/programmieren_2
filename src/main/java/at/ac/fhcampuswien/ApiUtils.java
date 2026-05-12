@@ -5,9 +5,6 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-
-//ue2:
-// import map and hashmap so we can save the search parameters inside a list of keys and values
 import java.util.Map;
 import java.util.HashMap;
 public class ApiUtils {
@@ -20,12 +17,6 @@ public class ApiUtils {
         os.write(bytes);
         os.close();
     }
-
-    //ue2:
-    // helper method takes the query part of the web link
-    // it splits it wherever there is & to separate different search terms
-    // then it splits those terms by the equals sign to get the name and the value
-    // it puts them all in a map and gives it back to us so we can search like links
 
     public static Map<String, String> parseQueryParams(String query) {
         Map<String, String> map = new HashMap<>();

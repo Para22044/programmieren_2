@@ -5,11 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-//ue2:
-//das ist eben neuer file
-//to hold all the logic about finding adding or deleting movies
-// separating the logic from the controller makes the code cleaner and much easier to test
-
 public class MovieService {
     // this holds our list of movies
     private List<Movie> movies;
@@ -41,9 +36,9 @@ public class MovieService {
         return true;
     }
 
-    // deletes a movie using the built in removeif function which is very fast and clean
+    // deletes a movie using the built-in remove if function which is very fast and clean
     public boolean deleteMovie(Movie toDelete) {
-        // removeif loops through the list for us and removes anything that matches our lambda conditions
+        // remove if loops through the list for us and removes anything that matches our lambda conditions
         return movies.removeIf(m ->
                 m.getTitle().equals(toDelete.getTitle()) &&
                         m.getGenre().equals(toDelete.getGenre()) &&
