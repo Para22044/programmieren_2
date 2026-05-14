@@ -12,7 +12,7 @@ public class DatabaseUtil {
     private static final String PASSWORD = "pw";
     // Java connects with "h2" - Connection gives back the Object
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(USER, JDBC_URL, PASSWORD);
+        return DriverManager.getConnection(JDBC_URL, USER, PASSWORD);
     }
     // Creates Tables
     public static void initializeDatabase() {       // Called when the server starts

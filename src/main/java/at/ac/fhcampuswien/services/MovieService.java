@@ -1,29 +1,44 @@
 package at.ac.fhcampuswien.services;
 
+// neu: movierepository wird importiert weil der service nicht mehr mit einer in-memory liste arbeitet sondern direkt mit der datenbank über das repository
+import at.ac.fhcampuswien.exceptions.DatabaseException;
+// neu: movienotfoundexception wird importiert weil methoden wie delete und update diese exception vom repository weiterwerfen können
+import at.ac.fhcampuswien.exceptions.MovieNotFoundException;
 import at.ac.fhcampuswien.models.Movie;
+// neu: movierepository import - das ist die klasse die alle sql operationen enthält
+import at.ac.fhcampuswien.repositories.MovieRepository;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MovieService {
-    // this holds our list of movies
-    private List<Movie> movies;
 
-    // the constructor takes the list of movies from the outside
-    //dependency injection, it helps pass whatever list
-    public MovieService(List<Movie> movies) {
-        this.movies = movies;
+    // neu: statt einer list<movie> wird jetzt eine movierepository instanz gehalten
+    // der service selbst speichert keine movies mehr - er fragt immer die datenbank via repository
+    private final MovieRepository movieRepository;
+
+    // neu: konstruktor nimmt jetzt ein movierepository objekt statt einer list<movie>
+    // das ist dependency injection - von außen (z.b. moviecontroller oder tests) wird das repository reingegeben
+    // dadurch kann man in tests ein gemocktes repository reingeben ohne echte db verbindung
+    public MovieService(MovieRepository movieRepository) {
+        this.movieRepository = movieRepository;
     }
 
-    // returns all movies
-    public List<Movie> getAllMovies() {
-        return movies;
+    // neu: throws DatabaseException hinzugefügt weil movierepository.findall() eine databaseexception werfen kann
+    // wenn die db verbindung fehlschlägt oder der sql befehl nicht ausgeführt werden kann
+    // die exception wird nicht hier gecatcht sondern weiterpropagiert zum controller
+    public List<Movie> getAllMovies() throws DatabaseException {
+        return movieRepository.findAll();
     }
 
-    // adds a movie but checks if it exists first using streams instead of the old for loop
-    public boolean addMovie(Movie newMovie) {
-        // the stream goes through the list and the lambda expression checks if any movie matches
-        boolean exists = movies.stream().anyMatch(m ->
+    // neu: throws DatabaseException hinzugefügt
+    // neu: statt movies.stream() auf einer lokalen liste wird jetzt movierepository.findall() aufgerufen
+    // um zu checken ob ein film schon existiert - danach movierepository.add() statt movies.add()
+    public boolean addMovie(Movie newMovie) throws DatabaseException {
+        // neu: findall() holt alle filme aus der datenbank für den duplikat-check
+        List<Movie> existing = movieRepository.findAll();
+        boolean exists = existing.stream().anyMatch(m ->
                 m.getTitle().equals(newMovie.getTitle()) &&
                         m.getGenre().equals(newMovie.getGenre()) &&
                         m.getReleaseYear() == newMovie.getReleaseYear()
@@ -32,63 +47,52 @@ public class MovieService {
             return false;
         }
 
-        movies.add(newMovie);
+        // neu: movierepository.add() führt den sql insert befehl aus statt movies.add() auf einer liste
+        movieRepository.add(newMovie);
         return true;
     }
 
-    // deletes a movie using the built-in remove if function which is very fast and clean
-    public boolean deleteMovie(Movie toDelete) {
-        // remove if loops through the list for us and removes anything that matches our lambda conditions
-        return movies.removeIf(m ->
-                m.getTitle().equals(toDelete.getTitle()) &&
-                        m.getGenre().equals(toDelete.getGenre()) &&
-                        m.getReleaseYear() == toDelete.getReleaseYear()
-        );
+    // neu: komplette methode refactored
+    // throws DatabaseException weil die db verbindung fehlschlagen kann
+    // throws MovieNotFoundException weil das repository diese exception wirft wenn kein film mit den kriterien gefunden wurde (rowsaffected == 0)
+    // statt removeif auf einer liste wird jetzt movierepository.delete() aufgerufen der den sql delete befehl ausführt
+    // rückgabewert boolean kommt direkt vom repository
+    public boolean deleteMovie(Movie toDelete) throws DatabaseException, MovieNotFoundException {
+        return movieRepository.delete(toDelete);
     }
 
-    // updates an existing movie by finding it first with a stream
-    public boolean updateMovie(Movie updatedMovie) {
-        Movie existingMovie = movies.stream()
-                .filter(m -> m.getId().equals(updatedMovie.getId()))
-                .findFirst()
-                .orElse(null);
-
-        if (existingMovie != null) {
-            existingMovie.setTitle(updatedMovie.getTitle());
-            existingMovie.setGenre(updatedMovie.getGenre());
-            existingMovie.setReleaseYear(updatedMovie.getReleaseYear());
-            return true;
-        }
-
-        return false;
+    // neu: komplette methode refactored
+    // throws DatabaseException und throws MovieNotFoundException aus dem gleichen grund wie bei deletemovie
+    // statt in einer liste nach id zu suchen und felder manuell zu setzen wird jetzt movierepository.update() aufgerufen
+    // das repository führt den sql update befehl aus und wirft movienotfoundexception wenn keine zeile betroffen war
+    public boolean updateMovie(Movie updatedMovie) throws DatabaseException, MovieNotFoundException {
+        return movieRepository.update(updatedMovie);
     }
 
-    // this is the new method that filters movies based on our search terms
-    public List<Movie> searchMovies(Map<String, String> params) {
-        return movies.stream()
+    // neu: throws DatabaseException hinzugefügt weil findall() eine databaseexception werfen kann
+    // die logik selbst ist identisch - alle filme werden aus der db geholt und dann in-memory gefiltert
+    public List<Movie> searchMovies(Map<String, String> params) throws DatabaseException {
+        // neu: movierepository.findall() statt direktem zugriff auf lokale liste
+        return movieRepository.findAll().stream()
                 .filter(m -> {
                     boolean matches = true;
 
-                    // if they searched for a title we make both strings lower case and check if one is inside the other
                     if (params.containsKey("title")) {
                         matches = matches && m.getTitle().toLowerCase().contains(params.get("title").toLowerCase());
                     }
 
-                    // we do the same exact thing for the genre
                     if (params.containsKey("genre")) {
-                        // we remove the hyphen just in case they search scifi instead of sci-fi
                         String searchGenre = params.get("genre").toLowerCase().replace("-", "");
                         String movieGenre = m.getGenre().toLowerCase().replace("-", "");
                         matches = matches && movieGenre.contains(searchGenre);
                     }
 
-                    // for the year we just change the number to a string and see if they equal
                     if (params.containsKey("releaseYear")) {
                         matches = matches && String.valueOf(m.getReleaseYear()).equals(params.get("releaseYear"));
                     }
 
                     return matches;
                 })
-                // finally we gather all the matching ones back into a list
                 .collect(Collectors.toList());
-    }}
+    }
+}
