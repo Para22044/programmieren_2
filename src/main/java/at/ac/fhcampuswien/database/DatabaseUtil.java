@@ -30,6 +30,7 @@ public class DatabaseUtil {
 
             statement.execute(sql);
         } catch (SQLException e) {
+            e.printStackTrace();
             throw new RuntimeException("Could not initialize database", e);
         }
     }
