@@ -21,6 +21,10 @@ public class MovieRepository {
         try (Connection connection = DatabaseUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             // Applies values reliably, because of Protection against SQL Injections
+            //replaced statement.setObject(1, movie.getId()); with
+            if (movie.getId() == null) {
+                movie.setId(UUID.randomUUID());
+            }
             statement.setObject(1, movie.getId());
             statement.setString(2, movie.getTitle());
             statement.setString(3, movie.getGenre());
@@ -29,6 +33,7 @@ public class MovieRepository {
             statement.executeUpdate();      // Executes SQL
 
         } catch (SQLException e) {
+            e.printStackTrace();
             throw new DatabaseException("Could not add movie to database", e);
         }
     }

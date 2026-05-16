@@ -2,6 +2,8 @@ package at.ac.fhcampuswien;
 
 import at.ac.fhcampuswien.controllers.HelloController;
 import at.ac.fhcampuswien.controllers.MovieController;
+// neu: databaseutil wird importiert damit initailizedatabase() beim serverstart aufgerufen werden kann
+import at.ac.fhcampuswien.database.DatabaseUtil;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -12,13 +14,16 @@ public class Main {
     private final static int SERVER_PORT = 8080;
 
     public static void main(String[] args) throws IOException {
-        // Create an HTTP server listening on defined port
+
+        // neu: databaseutil.initializedatabase() wird als allererstes aufgerufen bevor der server startet
+        // diese methode erstellt die movies tabelle falls sie noch nicht existiert (create table if not exists)
+        // wenn das nicht hier aufgerufen wird gibt es beim ersten db zugriff einen fehler weil die tabelle fehlt
+        DatabaseUtil.initializeDatabase();
+
         HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
 
-        //Controller
         MovieController movieController = new MovieController();
 
-        // Register controllers and their handlers - REST endpoints
         registerController(server, "/api/hello", new HelloController());
 
         registerController(server, "/api/movies/getAll", movieController);
@@ -27,7 +32,6 @@ public class Main {
         registerController(server, "/api/movies/update", movieController);
         registerController(server, "/api/movies/search", movieController);
 
-        // Start server
         server.setExecutor(null);
         server.start();
         System.out.printf("Server is running on http://localhost:%d", SERVER_PORT);

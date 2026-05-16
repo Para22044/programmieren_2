@@ -17,6 +17,8 @@ import at.ac.fhcampuswien.services.MovieService;
 
 public class MovieController implements HttpHandler {
 
+    // neu: movieservice bekommt jetzt ein new movierepository() reingegeben
+    // das ist nötig weil der movieservice konstruktor jetzt ein movierepository erwartet statt einer list<movie>
     private final MovieService movieService = new MovieService(new MovieRepository());
     private final Gson gson = new Gson();
 
@@ -26,8 +28,10 @@ public class MovieController implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
 
+        // neu: der gesamte routing block ist jetzt in einem try-catch block gewrapped
+        // alle exceptions die in den privaten handler methoden geworfen werden landen hier
+        // das bedeutet man muss exceptions nicht in jeder einzelnen methode fangen - zentrales exception handling
         try {
-
             if (path.endsWith("/getAll")) {
                 handleGetAll(exchange, method);
             } else if (path.endsWith("/add")) {
@@ -41,16 +45,22 @@ public class MovieController implements HttpHandler {
             } else {
                 ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Path not found\" }");
             }
+            // neu: databaseexception wird mit http 500 beantwortet - interner serverfehler weil die db nicht erreichbar ist oder sql fehlschlägt
         } catch (DatabaseException e) {
             ApiUtils.sendResponse(exchange, 500, "{ \"error\": \"" + e.getMessage() + "\" }");
+            // neu: movienotfoundexception wird mit http 404 beantwortet - der angeforderte film existiert nicht in der db
         } catch (MovieNotFoundException e) {
             ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"" + e.getMessage() + "\" }");
+            // neu: jsonsyntaxexception wird mit http 400 beantwortet - der client hat ungültiges json geschickt
+            // gson wirft diese exception automatisch wenn fromjson() ein malformed json bekommt
         } catch (JsonSyntaxException e) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Malformed JSON\" }");
+            // neu: allgemeiner fallback für alle anderen unerwarteten exceptions - http 500
         } catch (Exception e) {
             ApiUtils.sendResponse(exchange, 500, "{ \"error\": \"Unexpected server error\" }");
+        }
+    }
 
-    // get all
     private void handleGetAll(HttpExchange exchange, String method) throws IOException, DatabaseException {
 
         if (!method.equals("GET")) {
@@ -64,7 +74,6 @@ public class MovieController implements HttpHandler {
         ApiUtils.sendResponse(exchange, 200, json);
     }
 
-    // add
     private void handleAdd(HttpExchange exchange, String method) throws IOException, DatabaseException {
 
         if (!method.equals("POST")) {
@@ -89,8 +98,10 @@ public class MovieController implements HttpHandler {
         ApiUtils.sendResponse(exchange, 201, "{ \"message\": \"Movie added successfully\" }");
     }
 
-    // delete
-    private void handleDelete(HttpExchange exchange, String method) throws IOException, DatabaseException {
+    // neu: throws movienotfoundexception hinzugefügt weil movieservice.deletemovie() diese exception weitergibt
+    // wenn das repository keine zeile löscht (film existiert nicht) kommt movienotfoundexception hoch
+    // die exception wird nicht hier gefangen sondern geht weiter zum zentralen try-catch in handle()
+    private void handleDelete(HttpExchange exchange, String method) throws IOException, DatabaseException, MovieNotFoundException {
 
         if (!method.equals("DELETE")) {
             ApiUtils.sendResponse(exchange, 405, "{ \"error\": \"Method not allowed\" }");
@@ -105,15 +116,14 @@ public class MovieController implements HttpHandler {
             return;
         }
 
-        boolean success = movieService.deleteMovie(toDelete);
-        if (success) {
-            ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
-        } else {
-            ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
-        }
+        // neu: kein boolean check mehr nötig - wenn film nicht gefunden wird wirft das repository selbst eine movienotfoundexception
+        // die exception propagiert durch movieservice.deletemovie() direkt hierher und dann weiter zu handle()
+        movieService.deleteMovie(toDelete);
+        ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie deleted successfully\" }");
     }
 
-    // update
+    // neu: throws movienotfoundexception hinzugefügt - gleiche begründung wie bei handledelete
+    // neu: der innere try-catch wurde entfernt - exception handling passiert jetzt zentral in handle()
     private void handleUpdate(HttpExchange exchange, String method) throws IOException, DatabaseException, MovieNotFoundException {
 
         if (!method.equals("PUT")) {
@@ -122,19 +132,17 @@ public class MovieController implements HttpHandler {
         }
 
         String body = readBody(exchange);
-        try {
-            Movie updatedMovie = gson.fromJson(body, Movie.class);
-            boolean success = movieService.updateMovie(updatedMovie);
+        Movie updatedMovie = gson.fromJson(body, Movie.class);
 
-            if (success) {
-                ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
-            } else {
-                ApiUtils.sendResponse(exchange, 404, "{ \"error\": \"Movie not found\" }");
-            }
-
-        } catch (Exception e) {
+        if (updatedMovie == null) {
             ApiUtils.sendResponse(exchange, 400, "{ \"error\": \"Invalid movie data\" }");
+            return;
         }
+
+        // neu: kein boolean check mehr - wenn id nicht gefunden wird kommt movienotfoundexception vom repository
+        // propagiert durch movieservice.updatemovie() und wird in handle() als 404 beantwortet
+        movieService.updateMovie(updatedMovie);
+        ApiUtils.sendResponse(exchange, 200, "{ \"message\": \"Movie updated successfully\" }");
     }
 
     private void handleSearch(HttpExchange exchange, String method) throws IOException, DatabaseException {
@@ -151,7 +159,6 @@ public class MovieController implements HttpHandler {
         ApiUtils.sendResponse(exchange, 200, json);
     }
 
-    // read body
     private String readBody(HttpExchange exchange) throws IOException {
         InputStream is = exchange.getRequestBody();
         return new String(is.readAllBytes());
