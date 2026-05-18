@@ -18,7 +18,7 @@ import at.ac.fhcampuswien.services.MovieService;
 public class MovieController implements HttpHandler {
 
     // neu: movieservice bekommt jetzt ein new movierepository() reingegeben
-    // das ist nötig weil der movieservice konstruktor jetzt ein movierepository erwartet statt einer list<movie>
+    // weil der movieservice konstruktor jetzt ein movierepository erwartet statt einer list<movie>
     private final MovieService movieService = new MovieService(new MovieRepository());
     private final Gson gson = new Gson();
 
