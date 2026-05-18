@@ -64,7 +64,7 @@ public class MovieRepository {
     }
     // Delete movies
     public boolean delete(Movie movie) throws DatabaseException, MovieNotFoundException {
-        String sql = "DELETE FROM movies WHERE title = ? AND release_year = ?";
+        String sql = "DELETE FROM movies WHERE title = ? AND genre = ? AND release_year = ?";
 
         try (Connection connection = DatabaseUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -72,6 +72,25 @@ public class MovieRepository {
             statement.setString(1, movie.getTitle());
             statement.setString(2, movie.getGenre());
             statement.setInt(3, movie.getReleaseYear());
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             int rowsAffected = statement.executeUpdate();
             // Checks if anything was deleted
