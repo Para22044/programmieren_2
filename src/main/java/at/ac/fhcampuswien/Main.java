@@ -2,8 +2,11 @@ package at.ac.fhcampuswien;
 
 import at.ac.fhcampuswien.controllers.HelloController;
 import at.ac.fhcampuswien.controllers.MovieController;
-// neu: databaseutil wird importiert damit initailizedatabase() beim serverstart aufgerufen werden kann
 import at.ac.fhcampuswien.database.DatabaseUtil;
+import at.ac.fhcampuswien.repositories.H2MovieRepository;
+import at.ac.fhcampuswien.repositories.MovieRepository;
+import at.ac.fhcampuswien.repositories.MovieRepositoryAdapter;
+import at.ac.fhcampuswien.services.MovieService;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -15,17 +18,18 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
 
-        // neu: databaseutil.initializedatabase() wird als allererstes aufgerufen bevor der server startet
-        // diese methode erstellt die movies tabelle falls sie noch nicht existiert (create table if not exists)
-        // wenn das nicht hier aufgerufen wird gibt es beim ersten db zugriff einen fehler weil die tabelle fehlt
         DatabaseUtil.initializeDatabase();
-
         HttpServer server = HttpServer.create(new InetSocketAddress(SERVER_PORT), 0);
+        MovieRepository movieRepository =
+                new MovieRepositoryAdapter(new H2MovieRepository());
 
-        MovieController movieController = new MovieController();
+        MovieService movieService =
+                new MovieService(movieRepository);
+
+        MovieController movieController =
+                new MovieController(movieService);
 
         registerController(server, "/api/hello", new HelloController());
-
         registerController(server, "/api/movies/getAll", movieController);
         registerController(server, "/api/movies/add", movieController);
         registerController(server, "/api/movies/delete", movieController);

@@ -7,9 +7,9 @@ import java.sql.Statement;
 
 // Connection for Database
 public class DatabaseUtil {
-    private static final String USER = "user";
-    private static final String JDBC_URL = "jdbc:h2:~/moviesdb";    // use "h2" as Database - saves her local as "moviedb"
-    private static final String PASSWORD = "pw";
+    private static final String JDBC_URL = "jdbc:h2:~/moviesdb";
+    private static final String USER = "sa";
+    private static final String PASSWORD = "";
     // Java connects with "h2" - Connection gives back the Object
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(JDBC_URL, USER, PASSWORD);
